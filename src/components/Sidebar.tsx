@@ -8,6 +8,7 @@ interface SidebarProps {
   onSelect: (selection: SidebarSelection) => void
   onSelectNote?: (entry: VaultEntry) => void
   modifiedCount?: number
+  onCommitPush?: () => void
 }
 
 const FILTERS = [
@@ -26,7 +27,7 @@ const SECTION_GROUPS = [
   { label: 'PROCEDURES', type: 'Procedure' },
 ] as const
 
-export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCount = 0 }: SidebarProps) {
+export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCount = 0, onCommitPush }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -174,6 +175,14 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
           )
         })()}
       </nav>
+      {modifiedCount > 0 && onCommitPush && (
+        <div className="sidebar__commit">
+          <button className="sidebar__commit-btn" onClick={onCommitPush}>
+            Commit & Push
+            <span className="sidebar__badge">{modifiedCount}</span>
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

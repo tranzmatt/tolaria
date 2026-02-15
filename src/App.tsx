@@ -8,6 +8,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import { CreateNoteDialog, type NoteType } from './components/CreateNoteDialog'
 import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { Toast } from './components/Toast'
+import { CommitDialog } from './components/CommitDialog'
 import { isTauri, mockInvoke, addMockEntry, updateMockContent } from './mock-tauri'
 import type { VaultEntry, SidebarSelection, GitCommit, ModifiedFile } from './types'
 import './App.css'
@@ -140,6 +141,7 @@ function App() {
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showQuickOpen, setShowQuickOpen] = useState(false)
+  const [showCommitDialog, setShowCommitDialog] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Refs for keyboard shortcuts (to avoid stale closures)
@@ -500,10 +502,37 @@ function App() {
     return modifiedFiles.some((f) => f.path === path)
   }, [modifiedFiles])
 
+  const handleCommitPush = useCallback(async (message: string) => {
+    setShowCommitDialog(false)
+    try {
+      const vaultPath = TEST_VAULT_PATH.replace('~', '/Users/luca')
+      if (isTauri()) {
+        await invoke<string>('git_commit', { vaultPath, message })
+        setToastMessage('Changes committed')
+        try {
+          await invoke<string>('git_push', { vaultPath })
+          setToastMessage('Committed and pushed')
+        } catch (pushErr) {
+          console.warn('Push failed:', pushErr)
+          setToastMessage('Committed (push failed)')
+        }
+      } else {
+        await mockInvoke<string>('git_commit', { message })
+        await mockInvoke<string>('git_push', {})
+        setToastMessage('Committed and pushed')
+      }
+      // Refresh modified files
+      loadModifiedFiles()
+    } catch (err) {
+      console.error('Commit failed:', err)
+      setToastMessage(`Commit failed: ${err}`)
+    }
+  }, [loadModifiedFiles])
+
   return (
     <div className="app">
       <div className="app__sidebar" style={{ width: sidebarWidth }}>
-        <Sidebar entries={entries} selection={selection} onSelect={setSelection} onSelectNote={handleSelectNote} modifiedCount={modifiedFiles.length} />
+        <Sidebar entries={entries} selection={selection} onSelect={setSelection} onSelectNote={handleSelectNote} modifiedCount={modifiedFiles.length} onCommitPush={() => setShowCommitDialog(true)} />
       </div>
       <ResizeHandle onResize={handleSidebarResize} />
       <div className="app__note-list" style={{ width: noteListWidth }}>
@@ -551,6 +580,12 @@ function App() {
         open={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
         onCreate={handleCreateNote}
+      />
+      <CommitDialog
+        open={showCommitDialog}
+        modifiedCount={modifiedFiles.length}
+        onCommit={handleCommitPush}
+        onClose={() => setShowCommitDialog(false)}
       />
     </div>
   )

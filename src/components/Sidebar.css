@@ -243,3 +243,36 @@
   color: var(--accent-blue);
   font-weight: 500;
 }
+
+/* Commit button */
+.sidebar__commit {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.sidebar__commit-btn {
+  width: 100%;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-blue, #2196f3);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: opacity 0.15s;
+}
+
+.sidebar__commit-btn:hover {
+  opacity: 0.9;
+}
+
+.sidebar__commit-btn .sidebar__badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}

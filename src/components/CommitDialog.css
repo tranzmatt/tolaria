@@ -1,0 +1,119 @@
+.commit-dialog__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.commit-dialog {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  width: 420px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.commit-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.commit-dialog__header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.commit-dialog__count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--bg-button);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.commit-dialog__input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.commit-dialog__input::placeholder {
+  color: var(--text-faint);
+}
+
+.commit-dialog__input:focus {
+  border-color: var(--accent-blue);
+}
+
+.commit-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.commit-dialog__hint {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.commit-dialog__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.commit-dialog__cancel {
+  padding: 6px 14px;
+  font-size: 13px;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.commit-dialog__cancel:hover {
+  background: var(--bg-button);
+}
+
+.commit-dialog__submit {
+  padding: 6px 14px;
+  font-size: 13px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-blue, #2196f3);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.commit-dialog__submit:hover {
+  opacity: 0.9;
+}
+
+.commit-dialog__submit:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
