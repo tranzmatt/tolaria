@@ -772,7 +772,7 @@ function GitHistoryPanel({ commits }: { commits: GitCommit[] }) {
             {commits.map((c) => (
               <div key={c.hash} className="inspector__commit">
                 <div className="inspector__commit-top">
-                  <span className="inspector__commit-hash">{c.hash}</span>
+                  <span className="inspector__commit-hash">{c.shortHash}</span>
                   <span className="inspector__commit-date">{formatRelativeDate(c.date)}</span>
                 </div>
                 <div className="inspector__commit-msg">{c.message}</div>

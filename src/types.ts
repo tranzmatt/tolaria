@@ -10,18 +10,26 @@ export interface VaultEntry {
   owner: string | null
   cadence: string | null
   modifiedAt: number | null
+  createdAt: number | null
   fileSize: number
 }
 
 export interface GitCommit {
   hash: string
+  shortHash: string
   message: string
   author: string
   date: number // unix timestamp
 }
 
+export interface ModifiedFile {
+  path: string
+  relativePath: string
+  status: 'modified' | 'added' | 'deleted' | 'untracked' | 'renamed'
+}
+
 export type SidebarSelection =
-  | { kind: 'filter'; filter: 'all' | 'people' | 'events' | 'favorites' | 'trash' }
+  | { kind: 'filter'; filter: 'all' | 'people' | 'events' | 'favorites' | 'trash' | 'changes' }
   | { kind: 'sectionGroup'; type: string }
   | { kind: 'entity'; entry: VaultEntry }
   | { kind: 'topic'; entry: VaultEntry }

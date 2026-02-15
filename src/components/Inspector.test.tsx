@@ -51,9 +51,9 @@ const allContent: Record<string, string> = {
 
 const now = Math.floor(Date.now() / 1000)
 const mockGitHistory: GitCommit[] = [
-  { hash: 'a1b2c3d', message: 'Update test with latest changes', author: 'Luca Rossi', date: now - 86400 * 2 },
-  { hash: 'e4f5g6h', message: 'Add new section to test', author: 'Luca Rossi', date: now - 86400 * 5 },
-  { hash: 'i7j8k9l', message: 'Create test', author: 'Luca Rossi', date: now - 86400 * 12 },
+  { hash: 'a1b2c3d4e5f6a7b8', shortHash: 'a1b2c3d', message: 'Update test with latest changes', author: 'Luca Rossi', date: now - 86400 * 2 },
+  { hash: 'e4f5g6h7i8j9k0l1', shortHash: 'e4f5g6h', message: 'Add new section to test', author: 'Luca Rossi', date: now - 86400 * 5 },
+  { hash: 'i7j8k9l0m1n2o3p4', shortHash: 'i7j8k9l', message: 'Create test', author: 'Luca Rossi', date: now - 86400 * 12 },
 ]
 
 const defaultProps = {

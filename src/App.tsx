@@ -3,17 +3,126 @@ import { invoke } from '@tauri-apps/api/core'
 import { Sidebar } from './components/Sidebar'
 import { NoteList } from './components/NoteList'
 import { Editor } from './components/Editor'
-import { Inspector } from './components/Inspector'
+import { Inspector, type FrontmatterValue } from './components/Inspector'
 import { ResizeHandle } from './components/ResizeHandle'
 import { CreateNoteDialog, type NoteType } from './components/CreateNoteDialog'
 import { QuickOpenPalette } from './components/QuickOpenPalette'
 import { Toast } from './components/Toast'
-import { isTauri, mockInvoke, addMockEntry } from './mock-tauri'
+import { isTauri, mockInvoke, addMockEntry, updateMockContent } from './mock-tauri'
 import type { VaultEntry, SidebarSelection, GitCommit } from './types'
 import './App.css'
 
 // TODO: Make vault path configurable via settings
 const TEST_VAULT_PATH = '~/Laputa'
+
+// Mock frontmatter update for browser testing
+function updateMockFrontmatter(path: string, key: string, value: FrontmatterValue): string {
+  // This is a simplified mock - in reality the Rust backend handles this
+  const content = window.__mockContent?.[path] || ''
+  
+  // Format the key (quote if has spaces)
+  const yamlKey = key.includes(' ') ? `"${key}"` : key
+  
+  // Format the value
+  let yamlValue: string
+  if (Array.isArray(value)) {
+    yamlValue = '\n' + value.map(v => `  - "${v}"`).join('\n')
+  } else if (typeof value === 'boolean') {
+    yamlValue = value ? 'true' : 'false'
+  } else if (value === null) {
+    yamlValue = 'null'
+  } else {
+    yamlValue = String(value)
+  }
+  
+  // Check if content has frontmatter
+  if (!content.startsWith('---\n')) {
+    // Add frontmatter
+    return `---\n${yamlKey}: ${yamlValue}\n---\n${content}`
+  }
+  
+  // Find frontmatter end
+  const fmEnd = content.indexOf('\n---', 4)
+  if (fmEnd === -1) return content
+  
+  const fm = content.slice(4, fmEnd)
+  const rest = content.slice(fmEnd + 4)
+  
+  // Check if key exists
+  const keyPattern = new RegExp(`^["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:`, 'm')
+  
+  if (keyPattern.test(fm)) {
+    // Replace existing key - need to handle multiline values
+    const lines = fm.split('\n')
+    const newLines: string[] = []
+    let i = 0
+    while (i < lines.length) {
+      if (keyPattern.test(lines[i])) {
+        // Skip this key and any list items
+        i++
+        while (i < lines.length && lines[i].startsWith('  - ')) {
+          i++
+        }
+        // Add new value
+        if (Array.isArray(value)) {
+          newLines.push(`${yamlKey}:${yamlValue}`)
+        } else {
+          newLines.push(`${yamlKey}: ${yamlValue}`)
+        }
+        continue
+      }
+      newLines.push(lines[i])
+      i++
+    }
+    return `---\n${newLines.join('\n')}\n---${rest}`
+  } else {
+    // Add new key
+    if (Array.isArray(value)) {
+      return `---\n${fm}\n${yamlKey}:${yamlValue}\n---${rest}`
+    } else {
+      return `---\n${fm}\n${yamlKey}: ${yamlValue}\n---${rest}`
+    }
+  }
+}
+
+function deleteMockFrontmatterProperty(path: string, key: string): string {
+  const content = window.__mockContent?.[path] || ''
+  
+  if (!content.startsWith('---\n')) return content
+  
+  const fmEnd = content.indexOf('\n---', 4)
+  if (fmEnd === -1) return content
+  
+  const fm = content.slice(4, fmEnd)
+  const rest = content.slice(fmEnd + 4)
+  
+  const keyPattern = new RegExp(`^["']?${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']?\\s*:`, 'm')
+  
+  const lines = fm.split('\n')
+  const newLines: string[] = []
+  let i = 0
+  while (i < lines.length) {
+    if (keyPattern.test(lines[i])) {
+      // Skip this key and any list items
+      i++
+      while (i < lines.length && lines[i].startsWith('  - ')) {
+        i++
+      }
+      continue
+    }
+    newLines.push(lines[i])
+    i++
+  }
+  
+  return `---\n${newLines.join('\n')}\n---${rest}`
+}
+
+// Type declaration for mock content storage
+declare global {
+  interface Window {
+    __mockContent?: Record<string, string>
+  }
+}
 
 const DEFAULT_SELECTION: SidebarSelection = { kind: 'filter', filter: 'all' }
 
@@ -78,9 +187,10 @@ function App() {
       try {
         let history: GitCommit[]
         if (isTauri()) {
-          history = await invoke<GitCommit[]>('get_git_history', { path: activeTabPath })
+          const vaultPath = TEST_VAULT_PATH.replace('~', '/Users/luca')
+          history = await invoke<GitCommit[]>('get_file_history', { vaultPath, path: activeTabPath })
         } else {
-          history = await mockInvoke<GitCommit[]>('get_git_history', { path: activeTabPath })
+          history = await mockInvoke<GitCommit[]>('get_file_history', { path: activeTabPath })
         }
         setGitHistory(history)
       } catch (err) {
@@ -176,14 +286,43 @@ function App() {
   }, [])
 
   const handleNavigateWikilink = useCallback((target: string) => {
-    // Find entry by title (case-insensitive) or alias
-    const found = entries.find(
-      (e) =>
-        e.title.toLowerCase() === target.toLowerCase() ||
-        e.aliases.some((a) => a.toLowerCase() === target.toLowerCase())
-    )
+    // Find entry by various matching strategies:
+    // 1. Exact title match (case-insensitive)
+    // 2. Alias match
+    // 3. Path-based match (e.g., "responsibility/grow-newsletter" matches path ending with that)
+    // 4. Slug-to-title match (e.g., "grow-newsletter" → "Grow Newsletter")
+    
+    const targetLower = target.toLowerCase()
+    
+    // Convert slug to title case for comparison (e.g., "grow-newsletter" → "grow newsletter")
+    const slugToWords = (s: string) => s.replace(/-/g, ' ').toLowerCase()
+    const targetAsWords = slugToWords(target.split('/').pop() ?? target)
+    
+    const found = entries.find((e) => {
+      // 1. Exact title match
+      if (e.title.toLowerCase() === targetLower) return true
+      
+      // 2. Alias match
+      if (e.aliases.some((a) => a.toLowerCase() === targetLower)) return true
+      
+      // 3. Path-based match: target like "responsibility/grow-newsletter"
+      const pathStem = e.path.replace(/^.*\/Laputa\//, '').replace(/\.md$/, '')
+      if (pathStem.toLowerCase() === targetLower) return true
+      
+      // 4. Match just the filename stem
+      const fileStem = e.filename.replace(/\.md$/, '')
+      if (fileStem.toLowerCase() === targetLower.split('/').pop()) return true
+      
+      // 5. Slug-to-title match: "grow-newsletter" matches "Grow Newsletter"
+      if (e.title.toLowerCase() === targetAsWords) return true
+      
+      return false
+    })
+    
     if (found) {
       handleSelectNote(found)
+    } else {
+      console.warn(`Navigation target not found: ${target}`)
     }
   }, [entries, handleSelectNote])
 
@@ -256,10 +395,79 @@ function App() {
 
   const activeTab = tabs.find((t) => t.entry.path === activeTabPath) ?? null
 
+  // Frontmatter update handlers
+  const handleUpdateFrontmatter = useCallback(async (path: string, key: string, value: FrontmatterValue) => {
+    try {
+      let newContent: string
+      if (isTauri()) {
+        // Convert value to the format expected by Rust
+        let rustValue: unknown = value
+        if (Array.isArray(value)) {
+          rustValue = value
+        } else if (typeof value === 'boolean') {
+          rustValue = value
+        } else if (typeof value === 'number') {
+          rustValue = value
+        } else if (value === null) {
+          rustValue = null
+        } else {
+          rustValue = String(value)
+        }
+        newContent = await invoke<string>('update_frontmatter', { path, key, value: rustValue })
+      } else {
+        // Mock implementation for browser testing
+        newContent = updateMockFrontmatter(path, key, value)
+        updateMockContent(path, newContent)
+      }
+      
+      // Update the tab content
+      setTabs((prev) => prev.map((t) => 
+        t.entry.path === path ? { ...t, content: newContent } : t
+      ))
+      
+      // Update allContent for backlinks
+      setAllContent((prev) => ({ ...prev, [path]: newContent }))
+      
+      setToastMessage('Property updated')
+    } catch (err) {
+      console.error('Failed to update frontmatter:', err)
+      setToastMessage('Failed to update property')
+    }
+  }, [])
+
+  const handleDeleteProperty = useCallback(async (path: string, key: string) => {
+    try {
+      let newContent: string
+      if (isTauri()) {
+        newContent = await invoke<string>('delete_frontmatter_property', { path, key })
+      } else {
+        // Mock implementation
+        newContent = deleteMockFrontmatterProperty(path, key)
+        updateMockContent(path, newContent)
+      }
+      
+      setTabs((prev) => prev.map((t) => 
+        t.entry.path === path ? { ...t, content: newContent } : t
+      ))
+      
+      setAllContent((prev) => ({ ...prev, [path]: newContent }))
+      
+      setToastMessage('Property deleted')
+    } catch (err) {
+      console.error('Failed to delete property:', err)
+      setToastMessage('Failed to delete property')
+    }
+  }, [])
+
+  const handleAddProperty = useCallback(async (path: string, key: string, value: FrontmatterValue) => {
+    // Adding is the same as updating for new keys
+    return handleUpdateFrontmatter(path, key, value)
+  }, [handleUpdateFrontmatter])
+
   return (
     <div className="app">
       <div className="app__sidebar" style={{ width: sidebarWidth }}>
-        <Sidebar entries={entries} selection={selection} onSelect={setSelection} />
+        <Sidebar entries={entries} selection={selection} onSelect={setSelection} onSelectNote={handleSelectNote} />
       </div>
       <ResizeHandle onResize={handleSidebarResize} />
       <div className="app__note-list" style={{ width: noteListWidth }}>
@@ -289,6 +497,9 @@ function App() {
           allContent={allContent}
           gitHistory={gitHistory}
           onNavigate={handleNavigateWikilink}
+          onUpdateFrontmatter={handleUpdateFrontmatter}
+          onDeleteProperty={handleDeleteProperty}
+          onAddProperty={handleAddProperty}
         />
       </div>
       <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
