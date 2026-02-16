@@ -130,11 +130,9 @@
   margin-left: var(--lists-indent-size);
 }
 
-/* Align the vertical nesting lines with the center of the parent bullet.
-   BlockNote draws the line via ::before on .bn-block-outer inside nested groups.
-   We adjust its left position to align with the bullet center. */
+/* Hide the vertical nesting lines — cleaner without them */
 .editor__blocknote-container .bn-block-group .bn-block-group .bn-block-outer::before {
-  left: calc(var(--lists-indent-size) / 2) !important;
+  border-left: none !important;
 }
 
 /* --- Numbered lists --- */
