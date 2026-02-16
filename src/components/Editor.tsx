@@ -5,7 +5,9 @@ import { createReactInlineContentSpec, useCreateBlockNote, SuggestionMenuControl
 import { BlockNoteView } from '@blocknote/mantine'
 import '@blocknote/mantine/style.css'
 import type { VaultEntry } from '../types'
+import { useEditorTheme } from '../hooks/useTheme'
 import './Editor.css'
+import './EditorTheme.css'
 
 interface Tab {
   entry: VaultEntry
@@ -163,6 +165,7 @@ function BlockNoteTab({ content, entries, onNavigateWikilink }: { content: strin
   const [, body] = useMemo(() => splitFrontmatter(content), [content])
   const navigateRef = useRef(onNavigateWikilink)
   navigateRef.current = onNavigateWikilink
+  const { cssVars } = useEditorTheme()
 
   const editor = useCreateBlockNote({ schema })
 
@@ -217,7 +220,7 @@ function BlockNoteTab({ content, entries, onNavigateWikilink }: { content: strin
   const isDark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') !== 'light'
 
   return (
-    <div className="editor__blocknote-container">
+    <div className="editor__blocknote-container" style={cssVars as React.CSSProperties}>
       <BlockNoteView
         editor={editor}
         theme={isDark ? 'dark' : 'light'}

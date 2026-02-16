@@ -1,0 +1,179 @@
+/* ==============================================
+   EditorTheme.css — BlockNote theme overrides
+   Driven by CSS custom properties from theme.json
+   ============================================== */
+
+/* --- Editor root --- */
+.editor__blocknote-container .bn-editor {
+  font-family: var(--editor-font-family);
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  max-width: var(--editor-max-width);
+  padding: var(--editor-padding-vertical) var(--editor-padding-horizontal);
+  color: var(--colors-text);
+  caret-color: var(--colors-cursor);
+}
+
+.editor__blocknote-container .bn-editor ::selection {
+  background: var(--colors-selection);
+}
+
+/* --- Paragraph spacing --- */
+.editor__blocknote-container .bn-block-content[data-content-type="paragraph"] {
+  margin-bottom: var(--editor-paragraph-spacing);
+}
+
+/* --- Headings --- */
+.editor__blocknote-container [data-content-type="heading"][data-level="1"] .bn-inline-content {
+  font-size: var(--headings-h1-font-size);
+  font-weight: var(--headings-h1-font-weight);
+  line-height: var(--headings-h1-line-height);
+  color: var(--headings-h1-color);
+  letter-spacing: var(--headings-h1-letter-spacing);
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="1"] {
+  margin-top: var(--headings-h1-margin-top);
+  margin-bottom: var(--headings-h1-margin-bottom);
+}
+
+.editor__blocknote-container [data-content-type="heading"][data-level="2"] .bn-inline-content {
+  font-size: var(--headings-h2-font-size);
+  font-weight: var(--headings-h2-font-weight);
+  line-height: var(--headings-h2-line-height);
+  color: var(--headings-h2-color);
+  letter-spacing: var(--headings-h2-letter-spacing);
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="2"] {
+  margin-top: var(--headings-h2-margin-top);
+  margin-bottom: var(--headings-h2-margin-bottom);
+}
+
+.editor__blocknote-container [data-content-type="heading"][data-level="3"] .bn-inline-content {
+  font-size: var(--headings-h3-font-size);
+  font-weight: var(--headings-h3-font-weight);
+  line-height: var(--headings-h3-line-height);
+  color: var(--headings-h3-color);
+  letter-spacing: var(--headings-h3-letter-spacing);
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="3"] {
+  margin-top: var(--headings-h3-margin-top);
+  margin-bottom: var(--headings-h3-margin-bottom);
+}
+
+.editor__blocknote-container [data-content-type="heading"][data-level="4"] .bn-inline-content {
+  font-size: var(--headings-h4-font-size);
+  font-weight: var(--headings-h4-font-weight);
+  line-height: var(--headings-h4-line-height);
+  color: var(--headings-h4-color);
+  letter-spacing: var(--headings-h4-letter-spacing);
+}
+.editor__blocknote-container [data-content-type="heading"][data-level="4"] {
+  margin-top: var(--headings-h4-margin-top);
+  margin-bottom: var(--headings-h4-margin-bottom);
+}
+
+/* --- Bullet lists --- */
+.editor__blocknote-container [data-content-type="bulletListItem"] {
+  padding-left: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+}
+
+/* --- Numbered lists --- */
+.editor__blocknote-container [data-content-type="numberedListItem"] {
+  padding-left: var(--lists-padding-left);
+  margin-bottom: var(--lists-item-spacing);
+}
+
+/* --- Checkbox / check list items --- */
+.editor__blocknote-container [data-content-type="checkListItem"] {
+  margin-bottom: var(--lists-item-spacing);
+}
+
+/* --- Inline: bold --- */
+.editor__blocknote-container .bn-editor strong {
+  font-weight: var(--inline-styles-bold-font-weight);
+  color: var(--inline-styles-bold-color);
+}
+
+/* --- Inline: italic --- */
+.editor__blocknote-container .bn-editor em {
+  font-style: var(--inline-styles-italic-font-style);
+  color: var(--inline-styles-italic-color);
+}
+
+/* --- Inline: strikethrough --- */
+.editor__blocknote-container .bn-editor s,
+.editor__blocknote-container .bn-editor del {
+  color: var(--inline-styles-strikethrough-color);
+  text-decoration: var(--inline-styles-strikethrough-text-decoration);
+}
+
+/* --- Inline: code --- */
+.editor__blocknote-container .bn-editor code {
+  font-family: var(--inline-styles-code-font-family);
+  font-size: var(--inline-styles-code-font-size);
+  background-color: var(--inline-styles-code-background-color);
+  padding: var(--inline-styles-code-padding-vertical) var(--inline-styles-code-padding-horizontal);
+  border-radius: var(--inline-styles-code-border-radius);
+  color: var(--inline-styles-code-color);
+}
+
+/* --- Inline: links --- */
+.editor__blocknote-container .bn-editor a {
+  color: var(--inline-styles-link-color);
+  text-decoration: var(--inline-styles-link-text-decoration);
+}
+
+/* --- Wikilinks (override from Editor.css with theme vars) --- */
+.editor__blocknote-container .wikilink {
+  color: var(--inline-styles-wikilink-color);
+  text-decoration: var(--inline-styles-wikilink-text-decoration);
+  border-bottom: var(--inline-styles-wikilink-border-bottom);
+  cursor: var(--inline-styles-wikilink-cursor);
+}
+
+/* --- Code blocks --- */
+.editor__blocknote-container [data-content-type="codeBlock"] {
+  font-family: var(--code-blocks-font-family);
+  font-size: var(--code-blocks-font-size);
+  line-height: var(--code-blocks-line-height);
+  background-color: var(--code-blocks-background-color);
+  padding: var(--code-blocks-padding-vertical) var(--code-blocks-padding-horizontal);
+  border-radius: var(--code-blocks-border-radius);
+  margin-top: var(--code-blocks-margin-vertical);
+  margin-bottom: var(--code-blocks-margin-vertical);
+}
+
+/* --- Blockquote --- */
+.editor__blocknote-container [data-content-type="blockquote"],
+.editor__blocknote-container blockquote {
+  border-left: var(--blockquote-border-left-width) solid var(--blockquote-border-left-color);
+  padding-left: var(--blockquote-padding-left);
+  margin-top: var(--blockquote-margin-vertical);
+  margin-bottom: var(--blockquote-margin-vertical);
+  color: var(--blockquote-color);
+  font-style: var(--blockquote-font-style);
+}
+
+/* --- Table --- */
+.editor__blocknote-container [data-content-type="table"] table {
+  border-color: var(--table-border-color);
+  font-size: var(--table-font-size);
+}
+
+.editor__blocknote-container [data-content-type="table"] th {
+  background: var(--table-header-background);
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+}
+
+.editor__blocknote-container [data-content-type="table"] td {
+  padding: var(--table-cell-padding-vertical) var(--table-cell-padding-horizontal);
+  border-color: var(--table-border-color);
+}
+
+/* --- Horizontal rule --- */
+.editor__blocknote-container hr {
+  border: none;
+  border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
+  margin: var(--horizontal-rule-margin-vertical) 0;
+}
