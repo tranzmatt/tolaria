@@ -137,22 +137,9 @@ function filterEntries(entries: VaultEntry[], selection: SidebarSelection, _modi
   }
 }
 
-const TYPE_PILLS = [
-  { label: 'All', type: null },
-  { label: 'Projects', type: 'Project' },
-  { label: 'Notes', type: 'Note' },
-  { label: 'Events', type: 'Event' },
-  { label: 'People', type: 'Person' },
-  { label: 'Experiments', type: 'Experiment' },
-  { label: 'Procedures', type: 'Procedure' },
-  { label: 'Responsibilities', type: 'Responsibility' },
-] as const
-
-
 function NoteListInner({ entries, selection, selectedNote, modifiedFiles, onSelectNote, onCreateNote }: NoteListProps) {
   const [search, setSearch] = useState('')
   const [searchVisible, setSearchVisible] = useState(false)
-  const [typeFilter, setTypeFilter] = useState<string | null>(null)
 
   const isEntityView = selection.kind === 'entity'
 
@@ -190,21 +177,6 @@ function NoteListInner({ entries, selection, selectedNote, modifiedFiles, onSele
     [entityGroups, query]
   )
 
-  const typeCounts = useMemo(() => {
-    const counts = new Map<string | null, number>()
-    counts.set(null, searched.length)
-    for (const entry of searched) {
-      if (entry.isA) {
-        counts.set(entry.isA, (counts.get(entry.isA) ?? 0) + 1)
-      }
-    }
-    return counts
-  }, [searched])
-
-  const displayed = useMemo(
-    () => typeFilter ? searched.filter((e) => e.isA === typeFilter) : searched,
-    [searched, typeFilter]
-  )
 
   const renderItem = useCallback((entry: VaultEntry, isPinned = false) => {
     const isSelected = selectedNote?.path === entry.path && !isPinned
@@ -284,41 +256,6 @@ function NoteListInner({ entries, selection, selectedNote, modifiedFiles, onSele
         </div>
       )}
 
-      {/* Type filter pills */}
-      {!isEntityView && (
-        <div className="note-list__pills flex flex-wrap gap-1.5 border-b border-border px-3 py-2">
-          {TYPE_PILLS.filter(({ type }) => {
-            const count = typeCounts.get(type) ?? 0
-            return type === null || count > 0
-          }).map(({ label, type }) => {
-            const count = typeCounts.get(type) ?? 0
-            const isActive = typeFilter === type
-            const pillColor = type ? getTypeColor(type) : 'var(--accent-blue)'
-            const pillLightColor = type ? getTypeLightColor(type) : 'var(--accent-blue-light)'
-            return (
-              <button
-                key={label}
-                className={cn(
-                  "note-list__pill whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] uppercase transition-colors",
-                  !isActive && "border-[var(--border)] bg-transparent text-muted-foreground hover:bg-secondary"
-                )}
-                style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  ...(isActive && {
-                    borderColor: pillColor,
-                    backgroundColor: pillLightColor,
-                    color: pillColor,
-                  }),
-                }}
-                onClick={() => setTypeFilter(type)}
-              >
-                {label} {count}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {/* Items */}
       <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
         {isEntityView ? (
@@ -343,15 +280,15 @@ function NoteListInner({ entries, selection, selectedNote, modifiedFiles, onSele
             )}
           </div>
         ) : (
-          displayed.length === 0 ? (
+          searched.length === 0 ? (
             <div className="px-4 py-8 text-center text-[13px] text-muted-foreground">No notes found</div>
           ) : (
             <Virtuoso
               style={{ height: '100%' }}
-              totalCount={displayed.length}
-              initialItemCount={Math.min(displayed.length, 30)}
+              totalCount={searched.length}
+              initialItemCount={Math.min(searched.length, 30)}
               itemContent={(index) => {
-                const entry = displayed[index]
+                const entry = searched[index]
                 return entry ? renderItem(entry) : null
               }}
             />

@@ -133,8 +133,6 @@ describe('NoteList', () => {
     // Group headers shown
     expect(screen.getByText('Children')).toBeInTheDocument()
     expect(screen.getByText('Related To')).toBeInTheDocument()
-    // Type pills hidden in entity view
-    expect(container.querySelector('.note-list__pills')).toBeNull()
   })
 
   it('filters by topic (relatedTo references)', () => {
@@ -175,45 +173,6 @@ describe('NoteList', () => {
     const titles = screen.getAllByText(/Oldest|Newest|Middle/)
     const titleTexts = titles.map((el) => el.textContent)
     expect(titleTexts).toEqual(['Newest', 'Middle', 'Oldest'])
-  })
-
-  it('renders type filter pills with counts and hides empty types', () => {
-    const { container } = render(<NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />)
-    const pills = container.querySelectorAll('.note-list__pill')
-    const labels = Array.from(pills).map((p) => p.textContent)
-    // Pills show label + count (CSS uppercase applies visually but not in textContent)
-    expect(labels).toContain('All 5')
-    expect(labels).toContain('Projects 1')
-    expect(labels).toContain('Notes 1')
-    expect(labels).toContain('Events 1')
-    expect(labels).toContain('People 1')
-    // Empty types should be hidden
-    expect(labels.some((l) => l?.startsWith('Experiments'))).toBe(false)
-    expect(labels.some((l) => l?.startsWith('Procedures'))).toBe(false)
-    expect(labels.some((l) => l?.startsWith('Responsibilities'))).toBe(false)
-    // Verify pills have IBM Plex Mono font and uppercase class
-    const firstPill = pills[0] as HTMLElement
-    expect(firstPill.style.fontFamily).toContain('IBM Plex Mono')
-    expect(firstPill.className).toContain('uppercase')
-  })
-
-  it('filters by type pill', () => {
-    const { container } = render(<NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />)
-    const projectsPill = Array.from(container.querySelectorAll('.note-list__pill')).find((p) => p.textContent?.startsWith('Projects'))!
-    fireEvent.click(projectsPill)
-    expect(screen.getByText('Build Laputa App')).toBeInTheDocument()
-    expect(screen.queryByText('Matteo Cellini')).not.toBeInTheDocument()
-    expect(screen.queryByText('Facebook Ads Strategy')).not.toBeInTheDocument()
-  })
-
-  it('clicking All pill resets type filter', () => {
-    const { container } = render(<NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />)
-    const peoplePill = Array.from(container.querySelectorAll('.note-list__pill')).find((p) => p.textContent?.startsWith('People'))!
-    fireEvent.click(peoplePill)
-    expect(screen.queryByText('Build Laputa App')).not.toBeInTheDocument()
-    const allPill = Array.from(container.querySelectorAll('.note-list__pill')).find((p) => p.textContent?.startsWith('All'))!
-    fireEvent.click(allPill)
-    expect(screen.getByText('Build Laputa App')).toBeInTheDocument()
   })
 
   it('does not render type badge or status on note items', () => {
