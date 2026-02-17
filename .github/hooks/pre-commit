@@ -32,12 +32,14 @@ fi
 
 echo "   Comparing against: $BASE_REF"
 
-# Check if we have the CodeScene CLI or token
+# Check if we have CodeScene configured (MCP or CLI)
+CODESCENE_MCP_CONFIG="$HOME/.claude/mcp.json"
 CODESCENE_TOKEN_FILE="$HOME/.codescene/token"
 
-if [ ! -f "$CODESCENE_TOKEN_FILE" ]; then
-    echo "⚠️  CodeScene token not found at $CODESCENE_TOKEN_FILE"
-    echo "   Install CodeScene MCP or configure token to enable automatic checks"
+if [ ! -f "$CODESCENE_MCP_CONFIG" ] && [ ! -f "$CODESCENE_TOKEN_FILE" ]; then
+    echo "⚠️  CodeScene not configured"
+    echo "   Install CodeScene MCP (configured in ~/.claude/mcp.json)"
+    echo "   Or place token at ~/.codescene/token"
     echo "   Proceeding without check (use 'git commit --no-verify' to skip this warning)"
     exit 0
 fi
