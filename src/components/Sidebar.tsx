@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react'
+import { useState, memo, type ComponentType } from 'react'
 import type { VaultEntry, SidebarSelection } from '../types'
 import { cn } from '@/lib/utils'
 import { ChevronRight, ChevronDown, GitCommitHorizontal } from 'lucide-react'
@@ -41,7 +41,7 @@ const SECTION_GROUPS: { label: string; type: string; Icon: ComponentType<IconPro
   { label: 'Topics', type: 'Topic', Icon: Tag, color: 'var(--accent-green)' },
 ]
 
-export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCount = 0, onCommitPush }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCount = 0, onCommitPush }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleSection = (type: string) => {
     setCollapsed((prev) => ({ ...prev, [type]: !prev[type] }))
@@ -209,4 +209,4 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
       )}
     </aside>
   )
-}
+})

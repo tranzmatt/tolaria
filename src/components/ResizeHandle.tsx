@@ -7,12 +7,15 @@ interface ResizeHandleProps {
 export function ResizeHandle({ onResize }: ResizeHandleProps) {
   const isDragging = useRef(false)
   const lastX = useRef(0)
+  const pendingDelta = useRef(0)
+  const rafId = useRef(0)
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       isDragging.current = true
       lastX.current = e.clientX
+      pendingDelta.current = 0
       document.body.style.cursor = 'col-resize'
       document.body.style.userSelect = 'none'
     },
@@ -22,9 +25,18 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging.current) return
-      const delta = e.clientX - lastX.current
+      pendingDelta.current += e.clientX - lastX.current
       lastX.current = e.clientX
-      onResize(delta)
+
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(() => {
+          if (pendingDelta.current !== 0) {
+            onResize(pendingDelta.current)
+            pendingDelta.current = 0
+          }
+          rafId.current = 0
+        })
+      }
     }
 
     const handleMouseUp = () => {
@@ -32,6 +44,15 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
         isDragging.current = false
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
+        // Flush any pending delta
+        if (rafId.current) {
+          cancelAnimationFrame(rafId.current)
+          rafId.current = 0
+        }
+        if (pendingDelta.current !== 0) {
+          onResize(pendingDelta.current)
+          pendingDelta.current = 0
+        }
       }
     }
 
@@ -40,6 +61,7 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      if (rafId.current) cancelAnimationFrame(rafId.current)
     }
   }, [onResize])
 
