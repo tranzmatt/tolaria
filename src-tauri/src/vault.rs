@@ -199,91 +199,30 @@ fn capitalize_first(s: &str) -> String {
     }
 }
 
-/// Parse an ISO 8601 date string to Unix timestamp (seconds since epoch)
-/// Handles formats like "2025-05-23T14:35:00.000Z"
+/// Parse an ISO 8601 date string to Unix timestamp (seconds since epoch).
+/// Handles "2025-05-23T14:35:00.000Z" and "2025-05-23" formats.
 fn parse_iso_date(date_str: &str) -> Option<u64> {
-    // Try parsing as ISO 8601 with chrono-style manual parsing
-    // Format: "YYYY-MM-DDTHH:MM:SS.sssZ" or "YYYY-MM-DD"
-    let trimmed = date_str.trim().trim_matches('"');
-    
-    // Try full datetime format
-    if let Some(t_pos) = trimmed.find('T') {
-        let date_part = &trimmed[..t_pos];
-        let time_part = trimmed[t_pos + 1..].trim_end_matches('Z');
-        
-        let date_parts: Vec<&str> = date_part.split('-').collect();
-        if date_parts.len() != 3 {
-            return None;
-        }
-        
-        let year: i32 = date_parts[0].parse().ok()?;
-        let month: u32 = date_parts[1].parse().ok()?;
-        let day: u32 = date_parts[2].parse().ok()?;
-        
-        // Parse time part (may have milliseconds)
-        let time_no_ms = time_part.split('.').next()?;
-        let time_parts: Vec<&str> = time_no_ms.split(':').collect();
-        if time_parts.len() < 2 {
-            return None;
-        }
-        
-        let hour: u32 = time_parts[0].parse().ok()?;
-        let min: u32 = time_parts[1].parse().ok()?;
-        let sec: u32 = time_parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
-        
-        // Convert to Unix timestamp (simplified calculation)
-        // Days from epoch (1970-01-01) to the given date
-        let days_since_epoch = days_from_epoch(year, month, day)?;
-        let seconds = days_since_epoch as u64 * 86400 + hour as u64 * 3600 + min as u64 * 60 + sec as u64;
-        return Some(seconds);
-    }
-    
-    // Try date-only format
-    let date_parts: Vec<&str> = trimmed.split('-').collect();
-    if date_parts.len() == 3 {
-        let year: i32 = date_parts[0].parse().ok()?;
-        let month: u32 = date_parts[1].parse().ok()?;
-        let day: u32 = date_parts[2].parse().ok()?;
-        let days_since_epoch = days_from_epoch(year, month, day)?;
-        return Some(days_since_epoch as u64 * 86400);
-    }
-    
-    None
-}
+    use chrono::{NaiveDate, NaiveDateTime};
 
-/// Calculate days since Unix epoch (1970-01-01)
-fn days_from_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
-    // Simplified calculation - not accounting for all edge cases
-    if month < 1 || month > 12 || day < 1 || day > 31 {
-        return None;
+    let trimmed = date_str.trim().trim_matches('"');
+
+    // Try full datetime with optional fractional seconds and Z suffix
+    if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S%.fZ") {
+        return Some(dt.and_utc().timestamp() as u64);
     }
-    
-    // Days in each month (non-leap year)
-    let days_in_month = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    
-    let is_leap = |y: i32| (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
-    
-    // Days from 1970 to start of year
-    let mut total_days: i64 = 0;
-    for y in 1970..year {
-        total_days += if is_leap(y) { 366 } else { 365 };
+    if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%SZ") {
+        return Some(dt.and_utc().timestamp() as u64);
     }
-    for y in (year..1970).rev() {
-        total_days -= if is_leap(y) { 366 } else { 365 };
+    if let Ok(dt) = NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt.and_utc().timestamp() as u64);
     }
-    
-    // Days in current year up to start of month
-    for m in 1..month {
-        total_days += days_in_month[m as usize] as i64;
-        if m == 2 && is_leap(year) {
-            total_days += 1;
-        }
+
+    // Try date-only
+    if let Ok(d) = NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+        return Some(d.and_hms_opt(0, 0, 0)?.and_utc().timestamp() as u64);
     }
-    
-    // Add days in current month
-    total_days += (day - 1) as i64;
-    
-    Some(total_days)
+
+    None
 }
 
 /// Convert gray_matter::Pod to serde_json::Value
