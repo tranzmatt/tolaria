@@ -34,14 +34,14 @@ const TOP_NAV = [
   { label: 'Favorites', filter: 'favorites' as const, Icon: Star },
 ]
 
-const SECTION_GROUPS: { label: string; type: string; Icon: ComponentType<IconProps> }[] = [
-  { label: 'Projects', type: 'Project', Icon: Wrench },
-  { label: 'Experiments', type: 'Experiment', Icon: Flask },
-  { label: 'Responsibilities', type: 'Responsibility', Icon: Target },
-  { label: 'Procedures', type: 'Procedure', Icon: ArrowsClockwise },
-  { label: 'People', type: 'Person', Icon: Users },
-  { label: 'Events', type: 'Event', Icon: CalendarBlank },
-  { label: 'Topics', type: 'Topic', Icon: Tag },
+const SECTION_GROUPS: { label: string; type: string; Icon: ComponentType<IconProps>; color: string }[] = [
+  { label: 'Projects', type: 'Project', Icon: Wrench, color: 'var(--accent-red)' },
+  { label: 'Experiments', type: 'Experiment', Icon: Flask, color: 'var(--accent-red)' },
+  { label: 'Responsibilities', type: 'Responsibility', Icon: Target, color: 'var(--accent-purple)' },
+  { label: 'Procedures', type: 'Procedure', Icon: ArrowsClockwise, color: 'var(--accent-purple)' },
+  { label: 'People', type: 'Person', Icon: Users, color: 'var(--accent-yellow)' },
+  { label: 'Events', type: 'Event', Icon: CalendarBlank, color: 'var(--accent-yellow)' },
+  { label: 'Topics', type: 'Topic', Icon: Tag, color: 'var(--accent-green)' },
 ]
 
 export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCount = 0, onCommitPush }: SidebarProps) {
@@ -118,7 +118,7 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
                   "flex cursor-pointer select-none items-center gap-2 rounded transition-colors",
                   isActive({ kind: 'filter', filter })
                     ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    : "text-foreground hover:bg-accent"
                 )}
                 style={{ padding: '6px 16px', borderRadius: 4 }}
                 onClick={() => onSelect({ kind: 'filter', filter })}
@@ -138,7 +138,7 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
           })}
           {/* Disabled placeholders */}
           <div
-            className="flex select-none items-center gap-2 rounded text-muted-foreground"
+            className="flex select-none items-center gap-2 rounded text-foreground"
             style={{ padding: '6px 16px', borderRadius: 4, opacity: 0.4, cursor: 'not-allowed' }}
             title="Coming soon"
           >
@@ -146,7 +146,7 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
             <span className="flex-1 text-[13px] font-medium">Untagged</span>
           </div>
           <div
-            className="flex select-none items-center gap-2 rounded text-muted-foreground"
+            className="flex select-none items-center gap-2 rounded text-foreground"
             style={{ padding: '6px 16px', borderRadius: 4, opacity: 0.4, cursor: 'not-allowed' }}
             title="Coming soon"
           >
@@ -156,7 +156,7 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
         </div>
 
         {/* Section Groups */}
-        {SECTION_GROUPS.map(({ label, type, Icon }) => {
+        {SECTION_GROUPS.map(({ label, type, Icon, color }) => {
           const items = type === 'Topic'
             ? entries.filter((e) => e.isA === 'Topic')
             : entries.filter((e) => e.isA === type)
@@ -170,15 +170,15 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
                 className={cn(
                   "flex cursor-pointer select-none items-center justify-between rounded transition-colors",
                   isActive({ kind: 'sectionGroup', type })
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    ? "bg-secondary"
+                    : "hover:bg-accent"
                 )}
                 style={{ padding: '6px 16px', borderRadius: 4, gap: 8 }}
                 onClick={() => onSelect({ kind: 'sectionGroup', type })}
               >
                 <div className="flex items-center" style={{ gap: 8 }}>
-                  <Icon size={16} />
-                  <span className="text-[13px] font-medium">{label}</span>
+                  <Icon size={16} style={{ color }} />
+                  <span className="text-[13px] font-medium text-foreground">{label}</span>
                 </div>
                 <button
                   className="flex shrink-0 items-center border-none bg-transparent p-0 text-inherit cursor-pointer"
@@ -194,17 +194,23 @@ export function Sidebar({ entries, selection, onSelect, onSelectNote, modifiedCo
 
               {/* Children items */}
               {!isCollapsed && items.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {items.map((entry) => (
                     <div
                       key={entry.path}
                       className={cn(
                         "cursor-pointer truncate rounded-md text-[13px] font-medium transition-colors",
                         isActive(isTopic ? { kind: 'topic', entry } : { kind: 'entity', entry })
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          ? "text-foreground"
+                          : "text-foreground hover:bg-accent"
                       )}
-                      style={{ padding: '4px 16px 4px 28px' }}
+                      style={{
+                        padding: '4px 16px 4px 28px',
+                        ...(isActive(isTopic ? { kind: 'topic', entry } : { kind: 'entity', entry }) && {
+                          backgroundColor: 'var(--accent-red-light)',
+                          color: 'var(--accent-red)',
+                        }),
+                      }}
                       onClick={() => {
                         onSelect(isTopic ? { kind: 'topic', entry } : { kind: 'entity', entry })
                         onSelectNote?.(entry)
