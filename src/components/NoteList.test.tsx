@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import { NoteList } from './NoteList'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NoteList, getSortComparator } from './NoteList'
 import type { VaultEntry, SidebarSelection } from '../types'
 
 const allSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
@@ -245,5 +245,203 @@ describe('NoteList', () => {
     )
     // Snippet appears in the prominent card
     expect(screen.getByText('Build a personal knowledge management app.')).toBeInTheDocument()
+  })
+})
+
+describe('getSortComparator', () => {
+  const makeEntry = (overrides: Partial<VaultEntry>): VaultEntry => ({
+    path: '/test.md',
+    filename: 'test.md',
+    title: 'Test',
+    isA: null,
+    aliases: [],
+    belongsTo: [],
+    relatedTo: [],
+    status: null,
+    owner: null,
+    cadence: null,
+    archived: false,
+    modifiedAt: null,
+    createdAt: null,
+    fileSize: 100,
+    snippet: '',
+    relationships: {},
+    icon: null,
+    color: null,
+    ...overrides,
+  })
+
+  it('sorts by modified date descending', () => {
+    const a = makeEntry({ title: 'A', modifiedAt: 1000 })
+    const b = makeEntry({ title: 'B', modifiedAt: 3000 })
+    const c = makeEntry({ title: 'C', modifiedAt: 2000 })
+    const sorted = [a, b, c].sort(getSortComparator('modified'))
+    expect(sorted.map((e) => e.title)).toEqual(['B', 'C', 'A'])
+  })
+
+  it('sorts by created date descending', () => {
+    const a = makeEntry({ title: 'A', createdAt: 3000, modifiedAt: 1000 })
+    const b = makeEntry({ title: 'B', createdAt: 1000, modifiedAt: 3000 })
+    const c = makeEntry({ title: 'C', createdAt: 2000, modifiedAt: 2000 })
+    const sorted = [a, b, c].sort(getSortComparator('created'))
+    expect(sorted.map((e) => e.title)).toEqual(['A', 'C', 'B'])
+  })
+
+  it('sorts by created date, falling back to modifiedAt when createdAt is null', () => {
+    const a = makeEntry({ title: 'A', createdAt: null, modifiedAt: 5000 })
+    const b = makeEntry({ title: 'B', createdAt: 2000, modifiedAt: 1000 })
+    const sorted = [a, b].sort(getSortComparator('created'))
+    expect(sorted.map((e) => e.title)).toEqual(['A', 'B'])
+  })
+
+  it('sorts by title alphabetically', () => {
+    const a = makeEntry({ title: 'Zebra' })
+    const b = makeEntry({ title: 'Alpha' })
+    const c = makeEntry({ title: 'Middle' })
+    const sorted = [a, b, c].sort(getSortComparator('title'))
+    expect(sorted.map((e) => e.title)).toEqual(['Alpha', 'Middle', 'Zebra'])
+  })
+
+  it('sorts by status (Active > Paused > Done > null)', () => {
+    const a = makeEntry({ title: 'Done', status: 'Done', modifiedAt: 1000 })
+    const b = makeEntry({ title: 'Active', status: 'Active', modifiedAt: 1000 })
+    const c = makeEntry({ title: 'NoStatus', status: null, modifiedAt: 1000 })
+    const d = makeEntry({ title: 'Paused', status: 'Paused', modifiedAt: 1000 })
+    const sorted = [a, b, c, d].sort(getSortComparator('status'))
+    expect(sorted.map((e) => e.title)).toEqual(['Active', 'Paused', 'Done', 'NoStatus'])
+  })
+
+  it('sorts by status with modified date as tiebreaker', () => {
+    const a = makeEntry({ title: 'OlderActive', status: 'Active', modifiedAt: 1000 })
+    const b = makeEntry({ title: 'NewerActive', status: 'Active', modifiedAt: 3000 })
+    const sorted = [a, b].sort(getSortComparator('status'))
+    expect(sorted.map((e) => e.title)).toEqual(['NewerActive', 'OlderActive'])
+  })
+})
+
+describe('NoteList sort controls', () => {
+  beforeEach(() => {
+    try { localStorage.removeItem('laputa-sort-preferences') } catch { /* noop */ }
+  })
+
+  const makeEntry = (overrides: Partial<VaultEntry>): VaultEntry => ({
+    path: '/test.md',
+    filename: 'test.md',
+    title: 'Test',
+    isA: null,
+    aliases: [],
+    belongsTo: [],
+    relatedTo: [],
+    status: null,
+    owner: null,
+    cadence: null,
+    archived: false,
+    modifiedAt: null,
+    createdAt: null,
+    fileSize: 100,
+    snippet: '',
+    relationships: {},
+    icon: null,
+    color: null,
+    ...overrides,
+  })
+
+  it('shows sort button in note list header for flat view', () => {
+    render(
+      <NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+    expect(screen.getByTestId('sort-button-__list__')).toBeInTheDocument()
+  })
+
+  it('shows sort dropdown per relationship subsection in entity view', () => {
+    render(
+      <NoteList entries={mockEntries} selection={{ kind: 'entity', entry: mockEntries[0] }} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+    expect(screen.getByTestId('sort-button-Children')).toBeInTheDocument()
+  })
+
+  it('opens sort menu on click and shows all options', () => {
+    render(
+      <NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+    fireEvent.click(screen.getByTestId('sort-button-__list__'))
+    expect(screen.getByTestId('sort-menu-__list__')).toBeInTheDocument()
+    expect(screen.getByTestId('sort-option-modified')).toBeInTheDocument()
+    expect(screen.getByTestId('sort-option-created')).toBeInTheDocument()
+    expect(screen.getByTestId('sort-option-title')).toBeInTheDocument()
+    expect(screen.getByTestId('sort-option-status')).toBeInTheDocument()
+  })
+
+  it('changes sort order when an option is selected', () => {
+    const entries = [
+      makeEntry({ path: '/a.md', title: 'Zebra', modifiedAt: 3000 }),
+      makeEntry({ path: '/b.md', title: 'Alpha', modifiedAt: 1000 }),
+      makeEntry({ path: '/c.md', title: 'Middle', modifiedAt: 2000 }),
+    ]
+    render(
+      <NoteList entries={entries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+    // Default sort: by modified (Zebra first)
+    let titles = screen.getAllByText(/Zebra|Alpha|Middle/).map((el) => el.textContent)
+    expect(titles).toEqual(['Zebra', 'Middle', 'Alpha'])
+
+    // Switch to title sort
+    fireEvent.click(screen.getByTestId('sort-button-__list__'))
+    fireEvent.click(screen.getByTestId('sort-option-title'))
+
+    // Now should be alphabetical
+    titles = screen.getAllByText(/Zebra|Alpha|Middle/).map((el) => el.textContent)
+    expect(titles).toEqual(['Alpha', 'Middle', 'Zebra'])
+  })
+
+  it('closes sort menu after selecting an option', () => {
+    render(
+      <NoteList entries={mockEntries} selection={allSelection} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+    fireEvent.click(screen.getByTestId('sort-button-__list__'))
+    expect(screen.getByTestId('sort-menu-__list__')).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('sort-option-title'))
+    expect(screen.queryByTestId('sort-menu-__list__')).not.toBeInTheDocument()
+  })
+
+  it('sorts relationship subsection entries when sort option changed', () => {
+    // Create an entity with children that have different titles
+    const parent = makeEntry({
+      path: '/parent.md',
+      filename: 'parent.md',
+      title: 'Parent',
+      isA: 'Project',
+    })
+    const child1 = makeEntry({
+      path: '/child1.md',
+      filename: 'child1.md',
+      title: 'Zebra Note',
+      belongsTo: ['[[parent]]'],
+      modifiedAt: 3000,
+    })
+    const child2 = makeEntry({
+      path: '/child2.md',
+      filename: 'child2.md',
+      title: 'Alpha Note',
+      belongsTo: ['[[parent]]'],
+      modifiedAt: 1000,
+    })
+    const entries = [parent, child1, child2]
+
+    render(
+      <NoteList entries={entries} selection={{ kind: 'entity', entry: parent }} selectedNote={null} onSelectNote={noopSelect} allContent={{}} onCreateNote={vi.fn()} />
+    )
+
+    // Default sort: by modified — Zebra Note (3000) before Alpha Note (1000)
+    let titles = screen.getAllByText(/Zebra Note|Alpha Note/).map((el) => el.textContent)
+    expect(titles).toEqual(['Zebra Note', 'Alpha Note'])
+
+    // Switch to title sort
+    fireEvent.click(screen.getByTestId('sort-button-Children'))
+    fireEvent.click(screen.getByTestId('sort-option-title'))
+
+    // Now alphabetical: Alpha before Zebra
+    titles = screen.getAllByText(/Zebra Note|Alpha Note/).map((el) => el.textContent)
+    expect(titles).toEqual(['Alpha Note', 'Zebra Note'])
   })
 })
