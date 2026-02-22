@@ -3,60 +3,55 @@ import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, GitCommit, ModifiedFile } from '../types'
 
+function tauriCall<T>(command: string, tauriArgs: Record<string, unknown>, mockArgs?: Record<string, unknown>): Promise<T> {
+  return isTauri() ? invoke<T>(command, tauriArgs) : mockInvoke<T>(command, mockArgs ?? tauriArgs)
+}
+
+async function loadVaultData(vaultPath: string) {
+  if (!isTauri()) console.info('[mock] Using mock Tauri data for browser testing')
+  const entries = await tauriCall<VaultEntry[]>('list_vault', { path: vaultPath })
+  console.log(`Vault scan complete: ${entries.length} entries found`)
+  const allContent = isTauri() ? {} : await mockInvoke<Record<string, string>>('get_all_content', { path: vaultPath })
+  return { entries, allContent }
+}
+
+async function commitWithPush(vaultPath: string, message: string): Promise<string> {
+  if (!isTauri()) {
+    await mockInvoke<string>('git_commit', { message })
+    await mockInvoke<string>('git_push', {})
+    return 'Committed and pushed'
+  }
+  await invoke<string>('git_commit', { vaultPath, message })
+  try {
+    await invoke<string>('git_push', { vaultPath })
+    return 'Committed and pushed'
+  } catch {
+    return 'Committed (push failed)'
+  }
+}
+
 export function useVaultLoader(vaultPath: string) {
   const [entries, setEntries] = useState<VaultEntry[]>([])
   const [allContent, setAllContent] = useState<Record<string, string>>({})
   const [modifiedFiles, setModifiedFiles] = useState<ModifiedFile[]>([])
 
   useEffect(() => {
-    setEntries([])
-    setAllContent({})
-    setModifiedFiles([])
-
-    const loadVault = async () => {
-      try {
-        let result: VaultEntry[]
-        if (isTauri()) {
-          result = await invoke<VaultEntry[]>('list_vault', { path: vaultPath })
-        } else {
-          console.info('[mock] Using mock Tauri data for browser testing')
-          result = await mockInvoke<VaultEntry[]>('list_vault', { path: vaultPath })
-        }
-        console.log(`Vault scan complete: ${result.length} entries found`)
-        setEntries(result)
-
-        let content: Record<string, string>
-        if (isTauri()) {
-          content = {}
-        } else {
-          content = await mockInvoke<Record<string, string>>('get_all_content', { path: vaultPath })
-        }
-        setAllContent(content)
-      } catch (err) {
-        console.warn('Vault scan failed:', err)
-      }
-    }
-    loadVault()
+    setEntries([]); setAllContent({}); setModifiedFiles([])
+    loadVaultData(vaultPath)
+      .then(({ entries: e, allContent: c }) => { setEntries(e); setAllContent(c) })
+      .catch((err) => console.warn('Vault scan failed:', err))
   }, [vaultPath])
 
   const loadModifiedFiles = useCallback(async () => {
     try {
-      let files: ModifiedFile[]
-      if (isTauri()) {
-        files = await invoke<ModifiedFile[]>('get_modified_files', { vaultPath })
-      } else {
-        files = await mockInvoke<ModifiedFile[]>('get_modified_files', {})
-      }
-      setModifiedFiles(files)
+      setModifiedFiles(await tauriCall<ModifiedFile[]>('get_modified_files', { vaultPath }, {}))
     } catch (err) {
       console.warn('Failed to load modified files:', err)
       setModifiedFiles([])
     }
   }, [vaultPath])
 
-  useEffect(() => {
-    loadModifiedFiles()
-  }, [loadModifiedFiles])
+  useEffect(() => { loadModifiedFiles() }, [loadModifiedFiles])
 
   const addEntry = useCallback((entry: VaultEntry, content: string) => {
     setEntries((prev) => [entry, ...prev])
@@ -72,53 +67,25 @@ export function useVaultLoader(vaultPath: string) {
   }, [])
 
   const loadGitHistory = useCallback(async (path: string): Promise<GitCommit[]> => {
-    try {
-      if (isTauri()) {
-        return await invoke<GitCommit[]>('get_file_history', { vaultPath, path })
-      } else {
-        return await mockInvoke<GitCommit[]>('get_file_history', { path })
-      }
-    } catch (err) {
-      console.warn('Failed to load git history:', err)
-      return []
-    }
+    try { return await tauriCall<GitCommit[]>('get_file_history', { vaultPath, path }, { path }) }
+    catch (err) { console.warn('Failed to load git history:', err); return [] }
   }, [vaultPath])
 
-  const loadDiffAtCommit = useCallback(async (path: string, commitHash: string): Promise<string> => {
-    if (isTauri()) {
-      return invoke<string>('get_file_diff_at_commit', { vaultPath, path, commitHash })
-    } else {
-      return mockInvoke<string>('get_file_diff_at_commit', { path, commitHash })
-    }
-  }, [vaultPath])
+  const loadDiffAtCommit = useCallback((path: string, commitHash: string): Promise<string> =>
+    tauriCall<string>('get_file_diff_at_commit', { vaultPath, path, commitHash }, { path, commitHash }),
+  [vaultPath])
 
-  const loadDiff = useCallback(async (path: string): Promise<string> => {
-    if (isTauri()) {
-      return invoke<string>('get_file_diff', { vaultPath, path })
-    } else {
-      return mockInvoke<string>('get_file_diff', { path })
-    }
-  }, [vaultPath])
+  const loadDiff = useCallback((path: string): Promise<string> =>
+    tauriCall<string>('get_file_diff', { vaultPath, path }, { path }),
+  [vaultPath])
 
-  const isFileModified = useCallback((path: string): boolean => {
-    return modifiedFiles.some((f) => f.path === path)
-  }, [modifiedFiles])
+  const isFileModified = useCallback((path: string): boolean =>
+    modifiedFiles.some((f) => f.path === path),
+  [modifiedFiles])
 
-  const commitAndPush = useCallback(async (message: string): Promise<string> => {
-    if (isTauri()) {
-      await invoke<string>('git_commit', { vaultPath, message })
-      try {
-        await invoke<string>('git_push', { vaultPath })
-        return 'Committed and pushed'
-      } catch {
-        return 'Committed (push failed)'
-      }
-    } else {
-      await mockInvoke<string>('git_commit', { message })
-      await mockInvoke<string>('git_push', {})
-      return 'Committed and pushed'
-    }
-  }, [vaultPath])
+  const commitAndPush = useCallback((message: string): Promise<string> =>
+    commitWithPush(vaultPath, message),
+  [vaultPath])
 
   return {
     entries,

@@ -4,69 +4,65 @@ export interface ParsedFrontmatter {
   [key: string]: FrontmatterValue
 }
 
+function unquote(s: string): string {
+  return s.replace(/^["']|["']$/g, '')
+}
+
+function collapseList(items: string[]): FrontmatterValue {
+  return items.length === 1 ? items[0] : items
+}
+
+function isBlockScalar(value: string): boolean {
+  return value === '' || value === '|' || value === '>'
+}
+
+function parseInlineArray(value: string): FrontmatterValue {
+  const items = value.slice(1, -1).split(',').map(s => unquote(s.trim()))
+  return collapseList(items)
+}
+
+function parseScalar(value: string): FrontmatterValue {
+  const clean = unquote(value)
+  if (clean.toLowerCase() === 'true') return true
+  if (clean.toLowerCase() === 'false') return false
+  return clean
+}
+
 /** Parse YAML frontmatter from content */
 export function parseFrontmatter(content: string | null): ParsedFrontmatter {
   if (!content) return {}
-
   const match = content.match(/^---\n([\s\S]*?)\n---/)
   if (!match) return {}
 
-  const yaml = match[1]
   const result: ParsedFrontmatter = {}
-
   let currentKey: string | null = null
   let currentList: string[] = []
   let inList = false
 
-  const lines = yaml.split('\n')
-
-  for (const line of lines) {
+  for (const line of match[1].split('\n')) {
     const listMatch = line.match(/^  - (.*)$/)
     if (listMatch && currentKey) {
       inList = true
-      currentList.push(listMatch[1].replace(/^["']|["']$/g, ''))
+      currentList.push(unquote(listMatch[1]))
       continue
     }
 
     if (inList && currentKey) {
-      result[currentKey] = currentList.length === 1 ? currentList[0] : currentList
+      result[currentKey] = collapseList(currentList)
       currentList = []
       inList = false
     }
 
     const kvMatch = line.match(/^["']?([^"':]+)["']?\s*:\s*(.*)$/)
-    if (kvMatch) {
-      currentKey = kvMatch[1].trim()
-      const value = kvMatch[2].trim()
+    if (!kvMatch) continue
+    currentKey = kvMatch[1].trim()
+    const value = kvMatch[2].trim()
 
-      if (value === '' || value === '|' || value === '>') {
-        continue
-      }
-
-      if (value.startsWith('[') && value.endsWith(']')) {
-        const items = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, ''))
-        result[currentKey] = items.length === 1 ? items[0] : items
-        continue
-      }
-
-      const unquoted = value.replace(/^["']|["']$/g, '')
-
-      if (unquoted.toLowerCase() === 'true') {
-        result[currentKey] = true
-        continue
-      }
-      if (unquoted.toLowerCase() === 'false') {
-        result[currentKey] = false
-        continue
-      }
-
-      result[currentKey] = unquoted
-    }
+    if (isBlockScalar(value)) continue
+    if (value.startsWith('[') && value.endsWith(']')) { result[currentKey] = parseInlineArray(value); continue }
+    result[currentKey] = parseScalar(value)
   }
 
-  if (inList && currentKey) {
-    result[currentKey] = currentList.length === 1 ? currentList[0] : currentList
-  }
-
+  if (inList && currentKey) result[currentKey] = collapseList(currentList)
   return result
 }

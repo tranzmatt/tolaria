@@ -49,6 +49,166 @@ function formatDate(timestamp: number | null): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+function coerceValue(raw: string): FrontmatterValue {
+  if (raw.toLowerCase() === 'true') return true
+  if (raw.toLowerCase() === 'false') return false
+  if (!isNaN(Number(raw)) && raw.trim() !== '') return Number(raw)
+  return raw
+}
+
+function parseNewValue(rawValue: string): FrontmatterValue {
+  if (!rawValue.includes(',')) return rawValue.trim() || ''
+  const items = rawValue.split(',').map(s => s.trim()).filter(s => s)
+  return items.length === 1 ? items[0] : items
+}
+
+function isStatusKey(key: string): boolean {
+  return key === 'Status' || key.includes('Status')
+}
+
+function isDateKey(key: string): boolean {
+  return key.includes('Created') || key.includes('Modified') || key.includes('time') || key.includes('Date')
+}
+
+function StatusValue({ propKey, value, isEditing, onSave, onStartEdit }: {
+  propKey: string; value: FrontmatterValue; isEditing: boolean
+  onSave: (key: string, value: string) => void; onStartEdit: (key: string | null) => void
+}) {
+  const statusStr = String(value)
+  const style = STATUS_STYLES[statusStr] ?? DEFAULT_STATUS_STYLE
+  if (isEditing) {
+    return (
+      <input
+        className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
+        type="text" defaultValue={statusStr}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onSave(propKey, (e.target as HTMLInputElement).value)
+          if (e.key === 'Escape') onStartEdit(null)
+        }}
+        onBlur={(e) => onSave(propKey, e.target.value)}
+        autoFocus
+      />
+    )
+  }
+  return (
+    <span
+      className="inline-block min-w-0 cursor-pointer truncate transition-opacity hover:opacity-80"
+      style={{ backgroundColor: style.bg, color: style.color, borderRadius: 16, padding: '1px 6px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase' as const }}
+      onClick={() => onStartEdit(propKey)} title={statusStr}
+    >
+      {statusStr}
+    </span>
+  )
+}
+
+function BooleanToggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+  return (
+    <button
+      className="rounded border border-border bg-transparent px-2 py-0.5 text-xs text-secondary-foreground transition-colors hover:bg-muted"
+      onClick={onToggle}
+    >
+      {value ? '\u2713 Yes' : '\u2717 No'}
+    </button>
+  )
+}
+
+function AddPropertyForm({ onAdd, onCancel }: { onAdd: (key: string, value: string) => void; onCancel: () => void }) {
+  const [newKey, setNewKey] = useState('')
+  const [newValue, setNewValue] = useState('')
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && newKey.trim()) onAdd(newKey, newValue)
+    else if (e.key === 'Escape') onCancel()
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
+      <input
+        className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
+        type="text" placeholder="Property name" value={newKey}
+        onChange={(e) => setNewKey(e.target.value)} onKeyDown={handleKeyDown} autoFocus
+      />
+      <input
+        className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
+        type="text" placeholder="Value" value={newValue}
+        onChange={(e) => setNewValue(e.target.value)} onKeyDown={handleKeyDown}
+      />
+      <div className="flex justify-end gap-2">
+        <Button size="xs" onClick={() => onAdd(newKey, newValue)} disabled={!newKey.trim()}>Add</Button>
+        <Button size="xs" variant="outline" onClick={onCancel}>Cancel</Button>
+      </div>
+    </div>
+  )
+}
+
+function TypeRow({ isA, onNavigate }: { isA?: string; onNavigate?: (target: string) => void }) {
+  if (!isA) return null
+  return (
+    <div className="flex items-center justify-between">
+      <span className="font-mono-overline shrink-0 text-muted-foreground">Type</span>
+      {onNavigate ? (
+        <button
+          className="min-w-0 truncate border-none text-right cursor-pointer hover:opacity-80"
+          style={{ background: getTypeLightColor(isA), color: getTypeColor(isA), borderRadius: 6, padding: '2px 8px', fontSize: 12, fontWeight: 500 }}
+          onClick={() => onNavigate(`type/${isA.toLowerCase()}`)} title={isA}
+        >{isA}</button>
+      ) : (
+        <span className="text-right text-[12px] text-secondary-foreground">{isA}</span>
+      )}
+    </div>
+  )
+}
+
+function PropertyRow({ propKey, value, editingKey, onStartEdit, onSave, onSaveList, onUpdate, onDelete }: {
+  propKey: string; value: FrontmatterValue; editingKey: string | null
+  onStartEdit: (key: string | null) => void; onSave: (key: string, value: string) => void
+  onSaveList: (key: string, items: string[]) => void
+  onUpdate?: (key: string, value: FrontmatterValue) => void; onDelete?: (key: string) => void
+}) {
+  return (
+    <div className="group/prop flex items-center justify-between">
+      <span className="font-mono-overline flex shrink-0 items-center gap-1 text-muted-foreground">
+        {propKey}
+        {onDelete && (
+          <button className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100" onClick={() => onDelete(propKey)} title="Delete property">&times;</button>
+        )}
+      </span>
+      <PropertyValueCell propKey={propKey} value={value} isEditing={editingKey === propKey} onStartEdit={onStartEdit} onSave={onSave} onSaveList={onSaveList} onUpdate={onUpdate} />
+    </div>
+  )
+}
+
+function PropertyValueCell({ propKey, value, isEditing, onStartEdit, onSave, onSaveList, onUpdate }: {
+  propKey: string; value: FrontmatterValue; isEditing: boolean
+  onStartEdit: (key: string | null) => void; onSave: (key: string, value: string) => void
+  onSaveList: (key: string, items: string[]) => void; onUpdate?: (key: string, value: FrontmatterValue) => void
+}) {
+  const editProps = { value: String(value ?? ''), isEditing, onStartEdit: () => onStartEdit(propKey), onSave: (v: string) => onSave(propKey, v), onCancel: () => onStartEdit(null) }
+  if (value === null || value === undefined) return <EditableValue {...editProps} />
+  if (isStatusKey(propKey)) return <StatusValue propKey={propKey} value={value} isEditing={isEditing} onSave={onSave} onStartEdit={onStartEdit} />
+  if (Array.isArray(value)) return <TagPillList items={value.map(String)} onSave={(items) => onSaveList(propKey, items)} label={propKey} />
+  if (isDateKey(propKey)) return <EditableValue {...editProps} />
+  if (typeof value === 'boolean') return <BooleanToggle value={value} onToggle={() => onUpdate?.(propKey, !value)} />
+  return <EditableValue {...editProps} />
+}
+
+function StaticRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="font-mono-overline shrink-0 text-muted-foreground">{label}</span>
+      <span className="text-right text-[12px] text-secondary-foreground">{value}</span>
+    </div>
+  )
+}
+
+function AddPropertyButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      className="mt-3 w-full cursor-pointer border border-border bg-transparent text-center text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12 }}
+      onClick={onClick} disabled={disabled}
+    >+ Add property</button>
+  )
+}
+
 export function DynamicPropertiesPanel({
   entry,
   content,
@@ -68,219 +228,46 @@ export function DynamicPropertiesPanel({
 }) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
-  const [newKey, setNewKey] = useState('')
-  const [newValue, setNewValue] = useState('')
 
   const wordCount = countWords(content)
 
   const propertyEntries = useMemo(() => {
     return Object.entries(frontmatter)
-      .filter(([key, value]) => {
-        if (SKIP_KEYS.has(key)) return false
-        if (RELATIONSHIP_KEYS.has(key)) return false
-        if (containsWikilinks(value)) return false
-        return true
-      })
+      .filter(([key, value]) => !SKIP_KEYS.has(key) && !RELATIONSHIP_KEYS.has(key) && !containsWikilinks(value))
   }, [frontmatter])
 
   const handleSaveValue = useCallback((key: string, newValue: string) => {
     setEditingKey(null)
-    if (onUpdateProperty) {
-      if (newValue.toLowerCase() === 'true') onUpdateProperty(key, true)
-      else if (newValue.toLowerCase() === 'false') onUpdateProperty(key, false)
-      else if (!isNaN(Number(newValue)) && newValue.trim() !== '') onUpdateProperty(key, Number(newValue))
-      else onUpdateProperty(key, newValue)
-    }
+    if (onUpdateProperty) onUpdateProperty(key, coerceValue(newValue))
   }, [onUpdateProperty])
 
   const handleSaveList = useCallback((key: string, newItems: string[]) => {
-    if (onUpdateProperty) {
-      if (newItems.length === 0) onDeleteProperty?.(key)
-      else if (newItems.length === 1) onUpdateProperty(key, newItems[0])
-      else onUpdateProperty(key, newItems)
-    }
+    if (!onUpdateProperty) return
+    if (newItems.length === 0) onDeleteProperty?.(key)
+    else if (newItems.length === 1) onUpdateProperty(key, newItems[0])
+    else onUpdateProperty(key, newItems)
   }, [onUpdateProperty, onDeleteProperty])
 
-  const handleAddProperty = useCallback(() => {
-    if (newKey.trim() && onAddProperty) {
-      if (newValue.includes(',')) {
-        const items = newValue.split(',').map(s => s.trim()).filter(s => s)
-        onAddProperty(newKey.trim(), items.length === 1 ? items[0] : items)
-      } else {
-        onAddProperty(newKey.trim(), newValue.trim() || '')
-      }
-      setNewKey('')
-      setNewValue('')
-      setShowAddDialog(false)
-    }
-  }, [newKey, newValue, onAddProperty])
-
-  const handleAddKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleAddProperty()
-    else if (e.key === 'Escape') {
-      setShowAddDialog(false)
-      setNewKey('')
-      setNewValue('')
-    }
-  }
-
-  const renderEditableValue = (key: string, value: FrontmatterValue) => {
-    if (value === null || value === undefined) {
-      return (
-        <EditableValue
-          value="" isEditing={editingKey === key}
-          onStartEdit={() => setEditingKey(key)}
-          onSave={(v) => handleSaveValue(key, v)}
-          onCancel={() => setEditingKey(null)}
-        />
-      )
-    }
-
-    if (key === 'Status' || key.includes('Status')) {
-      const statusStr = String(value)
-      const style = STATUS_STYLES[statusStr] ?? DEFAULT_STATUS_STYLE
-      if (editingKey === key) {
-        return (
-          <input
-            className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
-            type="text" defaultValue={statusStr}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSaveValue(key, (e.target as HTMLInputElement).value)
-              if (e.key === 'Escape') setEditingKey(null)
-            }}
-            onBlur={(e) => handleSaveValue(key, e.target.value)}
-            autoFocus
-          />
-        )
-      }
-      return (
-        <span
-          className="inline-block min-w-0 cursor-pointer truncate transition-opacity hover:opacity-80"
-          style={{ backgroundColor: style.bg, color: style.color, borderRadius: 16, padding: '1px 6px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, fontWeight: 600, letterSpacing: '1.2px', textTransform: 'uppercase' as const }}
-          onClick={() => setEditingKey(key)} title={statusStr}
-        >
-          {statusStr}
-        </span>
-      )
-    }
-
-    if (Array.isArray(value)) {
-      return <TagPillList items={value.map(String)} onSave={(items) => handleSaveList(key, items)} label={key} />
-    }
-
-    if (key.includes('Created') || key.includes('Modified') || key.includes('time') || key.includes('Date')) {
-      return (
-        <EditableValue
-          value={String(value)} isEditing={editingKey === key}
-          onStartEdit={() => setEditingKey(key)}
-          onSave={(v) => handleSaveValue(key, v)}
-          onCancel={() => setEditingKey(null)}
-        />
-      )
-    }
-
-    if (typeof value === 'boolean') {
-      return (
-        <button
-          className="rounded border border-border bg-transparent px-2 py-0.5 text-xs text-secondary-foreground transition-colors hover:bg-muted"
-          onClick={() => onUpdateProperty?.(key, !value)}
-        >
-          {value ? '\u2713 Yes' : '\u2717 No'}
-        </button>
-      )
-    }
-
-    return (
-      <EditableValue
-        value={String(value)} isEditing={editingKey === key}
-        onStartEdit={() => setEditingKey(key)}
-        onSave={(v) => handleSaveValue(key, v)}
-        onCancel={() => setEditingKey(null)}
-      />
-    )
-  }
+  const handleAdd = useCallback((rawKey: string, rawValue: string) => {
+    if (!rawKey.trim() || !onAddProperty) return
+    onAddProperty(rawKey.trim(), parseNewValue(rawValue))
+    setShowAddDialog(false)
+  }, [onAddProperty])
 
   return (
     <div>
       <div className="flex flex-col gap-2">
-        {entry.isA && (
-          <div className="flex items-center justify-between">
-            <span className="font-mono-overline shrink-0 text-muted-foreground">Type</span>
-            {onNavigate ? (
-              <button
-                className="min-w-0 truncate border-none text-right cursor-pointer hover:opacity-80"
-                style={{
-                  background: getTypeLightColor(entry.isA),
-                  color: getTypeColor(entry.isA),
-                  borderRadius: 6,
-                  padding: '2px 8px',
-                  fontSize: 12,
-                  fontWeight: 500,
-                }}
-                onClick={() => onNavigate(`type/${entry.isA!.toLowerCase()}`)}
-                title={entry.isA}
-              >
-                {entry.isA}
-              </button>
-            ) : (
-              <span className="text-right text-[12px] text-secondary-foreground">{entry.isA}</span>
-            )}
-          </div>
-        )}
-
+        <TypeRow isA={entry.isA} onNavigate={onNavigate} />
         {propertyEntries.map(([key, value]) => (
-          <div key={key} className="group/prop flex items-center justify-between">
-            <span className="font-mono-overline flex shrink-0 items-center gap-1 text-muted-foreground">
-              {key}
-              {onDeleteProperty && (
-                <button
-                  className="border-none bg-transparent p-0 text-sm leading-none text-muted-foreground opacity-0 transition-all hover:text-destructive group-hover/prop:opacity-100"
-                  onClick={() => onDeleteProperty(key)} title="Delete property"
-                >
-                  &times;
-                </button>
-              )}
-            </span>
-            {renderEditableValue(key, value)}
-          </div>
+          <PropertyRow key={key} propKey={key} value={value} editingKey={editingKey} onStartEdit={setEditingKey} onSave={handleSaveValue} onSaveList={handleSaveList} onUpdate={onUpdateProperty} onDelete={onDeleteProperty} />
         ))}
-
-        <div className="flex items-center justify-between">
-          <span className="font-mono-overline shrink-0 text-muted-foreground">Modified</span>
-          <span className="text-right text-[12px] text-secondary-foreground">{formatDate(entry.modifiedAt)}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="font-mono-overline shrink-0 text-muted-foreground">Words</span>
-          <span className="text-right text-[12px] text-secondary-foreground">{wordCount}</span>
-        </div>
+        <StaticRow label="Modified" value={formatDate(entry.modifiedAt)} />
+        <StaticRow label="Words" value={String(wordCount)} />
       </div>
-
-      {showAddDialog ? (
-        <div className="mt-3 flex flex-col gap-2 rounded-md border border-border bg-muted p-3">
-          <input
-            className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
-            type="text" placeholder="Property name" value={newKey}
-            onChange={(e) => setNewKey(e.target.value)} onKeyDown={handleAddKeyDown} autoFocus
-          />
-          <input
-            className="w-full rounded border border-ring bg-muted px-2 py-1 text-[13px] text-foreground outline-none focus:border-primary"
-            type="text" placeholder="Value" value={newValue}
-            onChange={(e) => setNewValue(e.target.value)} onKeyDown={handleAddKeyDown}
-          />
-          <div className="flex justify-end gap-2">
-            <Button size="xs" onClick={handleAddProperty} disabled={!newKey.trim()}>Add</Button>
-            <Button size="xs" variant="outline" onClick={() => { setShowAddDialog(false); setNewKey(''); setNewValue('') }}>Cancel</Button>
-          </div>
-        </div>
-      ) : (
-        <button
-          className="mt-3 w-full cursor-pointer border border-border bg-transparent text-center text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-          style={{ borderRadius: 6, padding: '6px 12px', fontSize: 12 }}
-          onClick={() => setShowAddDialog(true)} disabled={!onAddProperty}
-        >
-          + Add property
-        </button>
-      )}
+      {showAddDialog
+        ? <AddPropertyForm onAdd={handleAdd} onCancel={() => setShowAddDialog(false)} />
+        : <AddPropertyButton onClick={() => setShowAddDialog(true)} disabled={!onAddProperty} />
+      }
     </div>
   )
 }

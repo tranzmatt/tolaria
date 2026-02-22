@@ -68,6 +68,34 @@ function addEntryWithMock(entry: VaultEntry, content: string, addEntry: (e: Vaul
   addEntry(entry, content)
 }
 
+function buildNoteContent(title: string, type: string, status: string | null): string {
+  const lines = ['---', `title: ${title}`, `is_a: ${type}`]
+  if (status) lines.push(`status: ${status}`)
+  lines.push('---')
+  return `${lines.join('\n')}\n\n# ${title}\n\n`
+}
+
+function resolveNewNote(title: string, type: string): { entry: VaultEntry; content: string } {
+  const folder = TYPE_FOLDER_MAP[type] || slugify(type)
+  const slug = slugify(title)
+  const status = NO_STATUS_TYPES.has(type) ? null : 'Active'
+  const entry = buildNewEntry({ path: `/Users/luca/Laputa/${folder}/${slug}.md`, slug, title, type, status })
+  return { entry, content: buildNoteContent(title, type, status) }
+}
+
+function resolveNewType(typeName: string): { entry: VaultEntry; content: string } {
+  const slug = slugify(typeName)
+  const entry = buildNewEntry({ path: `/Users/luca/Laputa/type/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
+  return { entry, content: `---\nIs A: Type\n---\n\n# ${typeName}\n\n` }
+}
+
+async function executeFrontmatterOp(op: 'update' | 'delete', path: string, key: string, value?: FrontmatterValue): Promise<string> {
+  if (op === 'update') {
+    return isTauri() ? invokeFrontmatter('update_frontmatter', { path, key, value }) : applyMockFrontmatterUpdate(path, key, value!)
+  }
+  return isTauri() ? invokeFrontmatter('delete_frontmatter_property', { path, key }) : applyMockFrontmatterDelete(path, key)
+}
+
 export function useNoteActions(
   addEntry: (entry: VaultEntry, content: string) => void,
   updateContent: (path: string, content: string) => void,
@@ -75,93 +103,50 @@ export function useNoteActions(
   setToastMessage: (msg: string | null) => void,
 ) {
   const tabMgmt = useTabManagement()
-  const { tabs, setTabs, handleSelectNote } = tabMgmt
+  const { setTabs, handleSelectNote } = tabMgmt
 
   const updateTabContent = useCallback((path: string, newContent: string) => {
-    setTabs((prev) => prev.map((t) =>
-      t.entry.path === path ? { ...t, content: newContent } : t
-    ))
+    setTabs((prev) => prev.map((t) => t.entry.path === path ? { ...t, content: newContent } : t))
     updateContent(path, newContent)
   }, [setTabs, updateContent])
 
   const handleNavigateWikilink = useCallback((target: string) => {
     const targetLower = target.toLowerCase()
     const targetAsWords = target.split('/').pop()?.replace(/-/g, ' ').toLowerCase() ?? targetLower
-
     const found = entries.find((e) => entryMatchesTarget(e, targetLower, targetAsWords))
     if (found) handleSelectNote(found)
     else console.warn(`Navigation target not found: ${target}`)
   }, [entries, handleSelectNote])
 
-  const handleCreateNote = useCallback(async (title: string, type: string) => {
-    const folder = TYPE_FOLDER_MAP[type] || slugify(type)
-    const slug = slugify(title)
-    const status = NO_STATUS_TYPES.has(type) ? null : 'Active'
-    const newEntry = buildNewEntry({ path: `/Users/luca/Laputa/${folder}/${slug}.md`, slug, title, type, status })
-
-    const frontmatter = [
-      '---', `title: ${title}`, `is_a: ${type}`,
-      ...(status ? [`status: ${status}`] : []),
-      '---',
-    ].join('\n')
-
-    addEntryWithMock(newEntry, `${frontmatter}\n\n# ${title}\n\n`, addEntry)
-    handleSelectNote(newEntry)
+  const handleCreateNote = useCallback((title: string, type: string) => {
+    const { entry, content } = resolveNewNote(title, type)
+    addEntryWithMock(entry, content, addEntry)
+    handleSelectNote(entry)
   }, [handleSelectNote, addEntry])
 
-  const handleCreateType = useCallback(async (typeName: string) => {
-    const slug = slugify(typeName)
-    const newEntry = buildNewEntry({ path: `/Users/luca/Laputa/type/${slug}.md`, slug, title: typeName, type: 'Type', status: null })
-    addEntryWithMock(newEntry, `---\nIs A: Type\n---\n\n# ${typeName}\n\n`, addEntry)
-    handleSelectNote(newEntry)
+  const handleCreateType = useCallback((typeName: string) => {
+    const { entry, content } = resolveNewType(typeName)
+    addEntryWithMock(entry, content, addEntry)
+    handleSelectNote(entry)
   }, [handleSelectNote, addEntry])
 
-  const handleUpdateFrontmatter = useCallback(async (path: string, key: string, value: FrontmatterValue) => {
+  const runFrontmatterOp = useCallback(async (op: 'update' | 'delete', path: string, key: string, value?: FrontmatterValue) => {
     try {
-      const newContent = isTauri()
-        ? await invokeFrontmatter('update_frontmatter', { path, key, value })
-        : applyMockFrontmatterUpdate(path, key, value)
-      updateTabContent(path, newContent)
-      setToastMessage('Property updated')
+      updateTabContent(path, await executeFrontmatterOp(op, path, key, value))
+      setToastMessage(op === 'update' ? 'Property updated' : 'Property deleted')
     } catch (err) {
-      console.error('Failed to update frontmatter:', err)
-      setToastMessage('Failed to update property')
+      console.error(`Failed to ${op} frontmatter:`, err)
+      setToastMessage(`Failed to ${op} property`)
     }
   }, [updateTabContent, setToastMessage])
-
-  const handleDeleteProperty = useCallback(async (path: string, key: string) => {
-    try {
-      const newContent = isTauri()
-        ? await invokeFrontmatter('delete_frontmatter_property', { path, key })
-        : applyMockFrontmatterDelete(path, key)
-      updateTabContent(path, newContent)
-      setToastMessage('Property deleted')
-    } catch (err) {
-      console.error('Failed to delete property:', err)
-      setToastMessage('Failed to delete property')
-    }
-  }, [updateTabContent, setToastMessage])
-
-  const handleAddProperty = useCallback(async (path: string, key: string, value: FrontmatterValue) => {
-    return handleUpdateFrontmatter(path, key, value)
-  }, [handleUpdateFrontmatter])
 
   return {
-    tabs,
-    activeTabPath: tabMgmt.activeTabPath,
-    activeTabPathRef: tabMgmt.activeTabPathRef,
-    handleCloseTabRef: tabMgmt.handleCloseTabRef,
-    handleSelectNote,
-    handleCloseTab: tabMgmt.handleCloseTab,
-    handleSwitchTab: tabMgmt.handleSwitchTab,
-    handleReorderTabs: tabMgmt.handleReorderTabs,
+    ...tabMgmt,
     handleNavigateWikilink,
     handleCreateNote,
     handleCreateType,
-    handleUpdateFrontmatter,
-    handleDeleteProperty,
-    handleAddProperty,
-    handleReplaceActiveTab: tabMgmt.handleReplaceActiveTab,
-    closeAllTabs: tabMgmt.closeAllTabs,
+    handleUpdateFrontmatter: useCallback((path: string, key: string, value: FrontmatterValue) => runFrontmatterOp('update', path, key, value), [runFrontmatterOp]),
+    handleDeleteProperty: useCallback((path: string, key: string) => runFrontmatterOp('delete', path, key), [runFrontmatterOp]),
+    handleAddProperty: useCallback((path: string, key: string, value: FrontmatterValue) => runFrontmatterOp('update', path, key, value), [runFrontmatterOp]),
   }
 }

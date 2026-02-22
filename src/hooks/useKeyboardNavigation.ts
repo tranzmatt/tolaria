@@ -71,55 +71,52 @@ function navigateNote(
   }
 }
 
+type ShortcutKind = 'tab' | 'note' | null
+
+function classifyShortcut(e: KeyboardEvent, inTauri: boolean): ShortcutKind {
+  const mod = e.metaKey || e.ctrlKey
+  if (!mod) return null
+  const isTabShortcut = inTauri ? (e.altKey && !e.shiftKey) : (e.shiftKey && !e.altKey)
+  if (isTabShortcut && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return 'tab'
+  if (e.altKey && !e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) return 'note'
+  return null
+}
+
+function arrowDirection(key: string): 1 | -1 {
+  return (key === 'ArrowRight' || key === 'ArrowDown') ? 1 : -1
+}
+
+function useLatestRef<T>(value: T): React.RefObject<T> {
+  const ref = useRef(value)
+  ref.current = value
+  return ref
+}
+
 export function useKeyboardNavigation({
-  tabs,
-  activeTabPath,
-  entries,
-  selection,
-  allContent,
-  onSwitchTab,
-  onReplaceActiveTab,
-  onSelectNote,
+  tabs, activeTabPath, entries, selection, allContent,
+  onSwitchTab, onReplaceActiveTab, onSelectNote,
 }: KeyboardNavigationOptions) {
   const visibleNotes = useMemo(
     () => computeVisibleNotes(entries, selection, allContent),
     [entries, selection, allContent],
   )
 
-  const tabsRef = useRef(tabs)
-  tabsRef.current = tabs
-  const activeTabPathRef = useRef(activeTabPath)
-  activeTabPathRef.current = activeTabPath
-  const visibleNotesRef = useRef(visibleNotes)
-  visibleNotesRef.current = visibleNotes
-  const onSwitchTabRef = useRef(onSwitchTab)
-  onSwitchTabRef.current = onSwitchTab
-  const onReplaceRef = useRef(onReplaceActiveTab)
-  onReplaceRef.current = onReplaceActiveTab
-  const onSelectNoteRef = useRef(onSelectNote)
-  onSelectNoteRef.current = onSelectNote
+  const tabsRef = useLatestRef(tabs)
+  const activeTabPathRef = useLatestRef(activeTabPath)
+  const visibleNotesRef = useLatestRef(visibleNotes)
+  const onSwitchTabRef = useLatestRef(onSwitchTab)
+  const onReplaceRef = useLatestRef(onReplaceActiveTab)
+  const onSelectNoteRef = useLatestRef(onSelectNote)
 
   useEffect(() => {
-    const isRunningInTauri = isTauri()
-
+    const inTauri = isTauri()
     const handleKeyDown = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey
-      if (!mod) return
-
-      const isTabShortcut = isRunningInTauri
-        ? e.altKey && !e.shiftKey
-        : e.shiftKey && !e.altKey
-      const isNoteShortcut = e.altKey && !e.shiftKey
-
-      if (isTabShortcut && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-        e.preventDefault()
-        navigateTab(tabsRef, activeTabPathRef, onSwitchTabRef, e.key === 'ArrowRight' ? 1 : -1)
-      } else if (isNoteShortcut && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-        e.preventDefault()
-        navigateNote(visibleNotesRef, activeTabPathRef, onReplaceRef, onSelectNoteRef, e.key === 'ArrowDown' ? 1 : -1)
-      }
+      const kind = classifyShortcut(e, inTauri)
+      if (!kind) return
+      e.preventDefault()
+      if (kind === 'tab') navigateTab(tabsRef, activeTabPathRef, onSwitchTabRef, arrowDirection(e.key))
+      else navigateNote(visibleNotesRef, activeTabPathRef, onReplaceRef, onSelectNoteRef, arrowDirection(e.key))
     }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
