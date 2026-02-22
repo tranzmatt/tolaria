@@ -12,7 +12,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   FileText, Star, Wrench, Flask, Target, ArrowsClockwise,
-  Users, CalendarBlank, Tag, TagSimple, Trash, StackSimple, Archive,
+  Users, CalendarBlank, Tag, TagSimple, Trash, StackSimple, Archive, CaretLeft,
 } from '@phosphor-icons/react'
 import { GitCommitHorizontal, SlidersHorizontal } from 'lucide-react'
 import {
@@ -31,6 +31,7 @@ interface SidebarProps {
   onReorderSections?: (orderedTypes: { typeName: string; order: number }[]) => void
   modifiedCount?: number
   onCommitPush?: () => void
+  onCollapse?: () => void
 }
 
 const BUILT_IN_SECTION_GROUPS: SectionGroup[] = [
@@ -169,6 +170,24 @@ function CommitButton({ modifiedCount, onClick }: { modifiedCount: number; onCli
   )
 }
 
+function SidebarTitleBar({ onCollapse }: { onCollapse?: () => void }) {
+  return (
+    <div className="shrink-0 flex items-center justify-end border-b border-border" style={{ height: 38, WebkitAppRegion: 'drag', padding: '0 8px' } as React.CSSProperties} data-tauri-drag-region>
+      {onCollapse && (
+        <button
+          className="flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          style={{ width: 24, height: 24, WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          onClick={onCollapse}
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
+        >
+          <CaretLeft size={14} weight="bold" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 function ContextMenuOverlay({ pos, type, innerRef, onOpenCustomize }: {
   pos: { x: number; y: number } | null; type: string | null
   innerRef: React.Ref<HTMLDivElement>
@@ -208,7 +227,7 @@ function CustomizeOverlay({ target, typeEntryMap, innerRef, onCustomize, onClose
 
 export const Sidebar = memo(function Sidebar({
   entries, selection, onSelect, onSelectNote, onCreateType, onCreateNewType,
-  onCustomizeType, onReorderSections, modifiedCount = 0, onCommitPush,
+  onCustomizeType, onReorderSections, modifiedCount = 0, onCommitPush, onCollapse,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [customizeTarget, setCustomizeTarget] = useState<string | null>(null)
@@ -268,7 +287,7 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <aside className="flex h-full flex-col overflow-hidden border-r border-[var(--sidebar-border)] bg-sidebar text-sidebar-foreground">
-      <div className="shrink-0 border-b border-border" style={{ height: 38, WebkitAppRegion: 'drag' } as React.CSSProperties} data-tauri-drag-region />
+      <SidebarTitleBar onCollapse={onCollapse} />
       <nav className="flex-1 overflow-y-auto">
         {/* Top nav */}
         <div className="border-b border-border" style={{ padding: '4px 6px' }}>

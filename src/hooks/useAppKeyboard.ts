@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import type { ViewMode } from './useViewMode'
 
 interface KeyboardActions {
   onQuickOpen: () => void
@@ -7,22 +8,52 @@ interface KeyboardActions {
   onOpenSettings: () => void
   onTrashNote: (path: string) => void
   onArchiveNote: (path: string) => void
+  onSetViewMode: (mode: ViewMode) => void
   activeTabPathRef: React.MutableRefObject<string | null>
   handleCloseTabRef: React.MutableRefObject<(path: string) => void>
 }
 
 type ShortcutHandler = () => void
 
+const VIEW_MODE_KEYS: Record<string, ViewMode> = {
+  '1': 'editor-only',
+  '2': 'editor-list',
+  '3': 'all',
+}
+
+function isAltOnly(e: KeyboardEvent): boolean {
+  return e.altKey && !e.metaKey && !e.ctrlKey
+}
+
+function handleViewModeKey(e: KeyboardEvent, onSetViewMode: (m: ViewMode) => void): boolean {
+  if (!isAltOnly(e)) return false
+  const mode = VIEW_MODE_KEYS[e.key]
+  if (!mode) return false
+  e.preventDefault()
+  onSetViewMode(mode)
+  return true
+}
+
+function handleCmdKey(e: KeyboardEvent, keyMap: Record<string, ShortcutHandler>): boolean {
+  const mod = e.metaKey || e.ctrlKey
+  if (!mod) return false
+  const handler = keyMap[e.key]
+  if (!handler) return false
+  e.preventDefault()
+  handler()
+  return true
+}
+
 export function useAppKeyboard({
   onQuickOpen, onCreateNote, onSave, onOpenSettings, onTrashNote, onArchiveNote,
-  activeTabPathRef, handleCloseTabRef,
+  onSetViewMode, activeTabPathRef, handleCloseTabRef,
 }: KeyboardActions) {
   const withActiveTab = (fn: (path: string) => void): ShortcutHandler => () => {
     const path = activeTabPathRef.current
     if (path) fn(path)
   }
 
-  const keyMap = useMemo((): Record<string, ShortcutHandler> => ({
+  const cmdKeyMap = useMemo((): Record<string, ShortcutHandler> => ({
     p: onQuickOpen,
     n: onCreateNote,
     s: onSave,
@@ -35,15 +66,9 @@ export function useAppKeyboard({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey
-      if (!mod) return
-      const handler = keyMap[e.key]
-      if (handler) {
-        e.preventDefault()
-        handler()
-      }
+      handleViewModeKey(e, onSetViewMode) || handleCmdKey(e, cmdKeyMap)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [keyMap])
+  }, [cmdKeyMap, onSetViewMode])
 }
