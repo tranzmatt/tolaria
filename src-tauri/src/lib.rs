@@ -189,7 +189,6 @@ mod tests {
         let result = create_vault_dir(vault_path.to_string_lossy().to_string());
         assert!(result.is_ok());
     }
-
 } // close mod tests
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
