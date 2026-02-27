@@ -38,6 +38,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ── 0. Build check (catches type errors and bundler failures) ─────────
+      - name: TypeScript type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Vite build check
+        run: pnpm build
+
       # ── 1. Tests ──────────────────────────────────────────────────────────
       - name: Run frontend tests
         run: pnpm test

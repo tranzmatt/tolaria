@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { CalendarIcon, XIcon } from 'lucide-react'
 import { getTypeColor, getTypeLightColor } from '../utils/typeColors'
 import { countWords } from '../utils/wikilinks'
-import { Check, X, Type, Calendar, ToggleLeft, Circle, Link } from 'lucide-react'
+import { Check, X, Type, Calendar as CalendarIcon2, ToggleLeft, Circle, Link } from 'lucide-react'
 import {
   type PropertyDisplayMode,
   getEffectiveDisplayMode,
@@ -237,7 +237,7 @@ function DisplayModeSelector({ propKey, currentMode, autoMode, onSelect }: {
 }
 
 const DISPLAY_MODE_ICONS: Record<PropertyDisplayMode, typeof Type> = {
-  text: Type, date: Calendar, boolean: ToggleLeft, status: Circle, url: Link,
+  text: Type, date: CalendarIcon2, boolean: ToggleLeft, status: Circle, url: Link,
 }
 
 function AddPropertyForm({ onAdd, onCancel }: {
